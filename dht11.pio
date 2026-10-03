@@ -1,0 +1,70 @@
+; DHT11を駆動するPIOコード
+
+.program dht11
+
+.wrap_target
+    ; ウェイト用の値として20000をメインプログラムから受け取る
+    pull block      ; osr = 20000
+
+    set pindirs, 1  ; Set pinsを出力に切り替え
+; スタートパルス20ms以上
+    set pins, 0     ; Low
+    mov x,osr       ; 20 000 us
+start_pulse:
+    jmp x-- start_pulse
+
+    set pindirs, 0  ; 入力に切り替え
+
+;   スタートパルスを待つ
+    mov  isr,null  ; ISRを0クリア
+    wait 1 pin, 0  ; バスがHighかチェック
+    wait 0 pin, 0  ; LOWを待つ
+    wait 1 pin, 0  ; HIGHを待つ
+
+    set y, 4       ; 5バイトを読み取る
+
+; 1バイト読み取りスタート
+start_byte:
+    mov osr, y      ; OSRにバイト数を退避
+    set y, 7        ; 8bitを読み取る
+bit_start:
+    wait 0 pin, 0   ; LOWになるまで待つ
+    wait 1 pin, 0   ; パルス
+    set x, 29       ; 30us以上HIGHなら1
+pulse_width_count:
+    jmp x-- pulse_width_count
+    in pins, 1      ; ISRにピンの値を入力し1bit終了
+    jmp y-- bit_start
+
+    ; 8bit読み取り終了
+    push noblock   ; ISRをFIFOにプッシュ
+    irq set 0       ; 割り込み発生
+    mov y, osr      ; バイト数カウンタを復帰
+    jmp y-- start_byte
+; 5バイト読み取り完了
+    irq set 1
+.wrap
+
+% c-sdk {
+#include "hardware/clocks.h"
+
+void dht11_program_init(PIO pio, uint sm, uint offset, uint pin) {
+    gpio_disable_pulls(pin);    // pinのプルアップダウンを無効化しておく
+    pio_gpio_init(pio, pin);
+    
+    pio_sm_config c = dht11_program_get_default_config(offset);
+    // Set pins
+    sm_config_set_set_pins(&c, pin, 1);
+
+    // In pins
+    sm_config_set_in_pin_base(&c, pin);
+    sm_config_set_in_pin_count(&c, 1);
+    sm_config_set_in_shift(&c, false, false, 0);
+
+    // 1MHz動作に
+    float clkdiv = (float)clock_get_hz(clk_sys) / 1000000;
+    sm_config_set_clkdiv(&c, clkdiv);
+
+    pio_sm_init(pio, sm, offset, &c);
+}
+%}

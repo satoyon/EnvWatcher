@@ -35,13 +35,19 @@ pico_sdk_init()
 
 # Add executable. Default name is the project name, version 0.1
 
-add_executable(EnvWatcher main.cpp )
+add_subdirectory(lib/tinykernel/tinykernel)
+add_subdirectory(lib/lcd_actor)
+
+add_executable(EnvWatcher main.cpp
+        dht11_sender.cpp
+        intl_sensor.cpp
+        )
 
 pico_set_program_name(EnvWatcher "EnvWatcher")
 pico_set_program_version(EnvWatcher "0.1")
 
 # Generate PIO header
-pico_generate_pio_header(EnvWatcher ${CMAKE_CURRENT_LIST_DIR}/blink.pio)
+pico_generate_pio_header(EnvWatcher ${CMAKE_CURRENT_LIST_DIR}/dht11.pio)
 
 # Modify the below lines to enable/disable output over UART/USB
 pico_enable_stdio_uart(EnvWatcher 1)
@@ -60,6 +66,9 @@ target_include_directories(EnvWatcher PRIVATE
 target_link_libraries(EnvWatcher 
         hardware_dma
         hardware_pio
+        hardware_adc
+        lcd_actor
+        tinykernel_lib
         )
 
 pico_add_extra_outputs(EnvWatcher)
