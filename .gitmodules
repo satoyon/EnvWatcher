@@ -1,0 +1,3 @@
+[submodule "lib/tinykernel"]
+	path = lib/tinykernel
+	url = git@github.com:satoyon/tinykernel.git
